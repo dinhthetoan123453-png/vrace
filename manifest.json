@@ -1,0 +1,17 @@
+{
+  "name": "Garmin & Strava TCX Route Generator (vRace)",
+  "short_name": "vRace TCX",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#fc4c02",
+  "description": "Vẽ lộ trình đường phố & Xuất file TCX chuẩn có GPS, Pace, Nhịp tim & Cadence từng giây cho Garmin, Strava, vRace",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

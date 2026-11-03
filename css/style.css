@@ -1,0 +1,126 @@
+/* Custom scrollbars */
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+::-webkit-scrollbar-track {
+    background: #f8fafc;
+}
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Hide scrollbar utility for horizontal scroll carousels */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Mobile tap & safe-area optimizations */
+html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+}
+
+body {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Leaflet Container & Font */
+.leaflet-container {
+    font-family: inherit;
+    background-color: #f1f5f9;
+    touch-action: pan-x pan-y;
+}
+
+/* Custom map markers */
+.custom-pin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 11px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+    transition: transform 0.15s ease-out;
+    touch-action: none;
+    cursor: pointer;
+}
+.custom-pin:hover,
+.custom-pin:active {
+    transform: scale(1.2);
+}
+
+.pin-start {
+    background: #10b981;
+}
+
+.pin-end {
+    background: #ef4444;
+}
+
+.pin-waypoint {
+    background: #3b82f6;
+    width: 14px !important;
+    height: 14px !important;
+    margin-left: -7px !important;
+    margin-top: -7px !important;
+    border: 1.5px solid white;
+}
+
+/* User GPS location pulsing marker */
+.user-location-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+/* Custom Range Input Styling for Mobile Touch */
+input[type="range"] {
+    accent-color: #fc4c02;
+    touch-action: pan-x;
+}
+input[type="range"]::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+input[type="range"]::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Prevent auto-zooming on focus in iOS mobile safari */
+@media (max-width: 640px) {
+    input[type="text"],
+    input[type="number"],
+    input[type="datetime-local"],
+    select {
+        font-size: 14px;
+    }
+}
+
+/* Animation utilities */
+@keyframes pulseSubtle {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+.animate-pulse-subtle {
+    animation: pulseSubtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

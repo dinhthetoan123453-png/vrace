@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <meta name="theme-color" content="#fc4c02">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="vRace TCX">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <title>Garmin & Strava TCX Route & Telemetry Generator (vRace)</title>
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        strava: '#fc4c02',
+                        garmin: '#007cc3'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- JSZip for Batch TCX Zip Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Custom CSS Stylesheet -->
+    <link rel="stylesheet" href="css/style.css?v=3.7">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans selection:bg-strava selection:text-white">
+
+    <!-- Top Header (Sáng sủa, Tinh tế, Tối ưu Mobile) -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 px-3 sm:px-4 py-2.5 sm:py-3 shadow-xs">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-2">
+            <div class="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-strava to-orange-400 flex items-center justify-center shadow-md shadow-strava/20 text-white font-black text-lg sm:text-xl shrink-0">
+                    <i data-lucide="activity"></i>
+                </div>
+                <div class="truncate">
+                    <h1 class="text-sm sm:text-base md:text-lg font-bold text-slate-900 flex items-center gap-1.5 sm:gap-2 truncate">
+                        Garmin & Strava TCX
+                        <span class="text-[10px] sm:text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-50 text-strava border border-orange-200/60 hidden xs:inline-block">vRace</span>
+                    </h1>
+                    <p class="text-[11px] sm:text-xs text-slate-500 hidden sm:block truncate">Vẽ lộ trình đường phố & Xuất file TCX chuẩn có GPS, Pace, Nhịp tim & Cadence từng giây</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-1 sm:gap-2 shrink-0">
+                <span class="inline-flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    1s TCX
+                </span>
+                <span class="hidden md:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+                    Garmin
+                </span>
+                <span class="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
+                    <i data-lucide="flame" class="w-3 h-3 sm:w-3.5 sm:h-3.5"></i>
+                    Strava/vRace
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mobile Navigation Tab Bar (Chỉ hiển thị trên Mobile / Tablet < lg) -->
+    <nav class="lg:hidden sticky top-[53px] sm:top-[61px] z-20 bg-white/95 backdrop-blur-md border-b border-slate-200 px-2.5 py-1.5 shadow-xs">
+        <div class="flex items-center justify-between gap-1 max-w-md mx-auto">
+            <button type="button" onclick="switchMobileTab('map')" id="tabBtnMap" class="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition bg-orange-500 text-white shadow-xs">
+                <i data-lucide="map" class="w-3.5 h-3.5"></i>
+                <span>Bản đồ</span>
+            </button>
+            <button type="button" onclick="switchMobileTab('settings')" id="tabBtnSettings" class="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition text-slate-600 hover:bg-slate-100">
+                <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+                <span>Cài đặt & Pace</span>
+            </button>
+            <button type="button" onclick="switchMobileTab('analysis')" id="tabBtnAnalysis" class="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-semibold transition text-slate-600 hover:bg-slate-100">
+                <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i>
+                <span>Laps & Biểu đồ</span>
+            </button>
+            <button type="button" onclick="openBatchModalFromMobile()" id="tabBtnBatch" class="flex items-center justify-center py-2 px-2.5 rounded-xl text-xs font-semibold transition text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200" title="Tạo hàng loạt">
+                <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                <span class="hidden sm:inline ml-1">Hàng loạt</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Workspace Container -->
+    <main class="max-w-7xl w-full mx-auto p-2.5 sm:p-4 md:p-6 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6">
+        
+        <!-- LEFT COLUMN: Control Panel & Stats (5 Cols on LG, Hidden on mobile when on Map/Analysis tabs) -->
+        <div id="mobilePanelSettings" class="lg:col-span-5 hidden lg:flex flex-col gap-4">
+            
+            <!-- Card 1: Overview Summary Stats -->
+            <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-xs font-bold text-slate-500 tracking-wider uppercase flex items-center gap-1.5">
+                        <i data-lucide="gauge" class="w-4 h-4 text-strava"></i>
+                        Thông Số Bài Chạy
+                    </h2>
+                    <span class="text-xs text-slate-400 font-medium"><span id="statPoints">0</span> điểm mốc</span>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2.5">
+                    <div class="bg-slate-50 border border-slate-200/70 rounded-xl p-3 text-center">
+                        <span class="text-xs text-slate-500 font-medium block mb-0.5">Quãng đường</span>
+                        <div class="text-xl md:text-2xl font-black text-slate-900" id="statDistance">0.00 <span class="text-xs font-normal text-slate-500">km</span></div>
+                    </div>
+                    <div class="bg-emerald-50/60 border border-emerald-200/70 rounded-xl p-3 text-center">
+                        <span class="text-xs text-emerald-700 font-medium block mb-0.5">Thời gian</span>
+                        <div class="text-xl md:text-2xl font-black text-emerald-600 font-mono" id="statDuration">00:00:00</div>
+                    </div>
+                    <div class="bg-orange-50/60 border border-orange-200/70 rounded-xl p-3 text-center">
+                        <span class="text-xs text-orange-700 font-medium block mb-0.5">Pace TB</span>
+                        <div class="text-xl md:text-2xl font-black text-orange-600 font-mono" id="statPace">5:30 <span class="text-xs font-normal text-orange-600">/km</span></div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-xs text-slate-500 mt-3 pt-2.5 border-t border-slate-100 px-1">
+                    <span>Tốc độ: <strong class="text-slate-700 font-semibold" id="statSpeed">10.9 km/h</strong></span>
+                    <span>Calo ước tính: <strong class="text-amber-600 font-semibold" id="statCalories">0 kcal</strong></span>
+                </div>
+
+                <!-- Thời gian xuất phát -->
+                <div class="mt-3 pt-3 border-t border-slate-100">
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                        <span class="flex items-center gap-1.5 font-bold text-slate-700">
+                            <i data-lucide="calendar" class="w-3.5 h-3.5 text-orange-500"></i> Thời gian xuất phát:
+                        </span>
+                        <button id="btnSetNow" onclick="if(typeof setStartTimeToNow==='function')setStartTimeToNow();else{const el=document.getElementById('inputStartTime');if(el)el.value=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);}" type="button" class="text-[11px] text-orange-600 font-semibold hover:text-orange-700 flex items-center gap-1 bg-orange-50 hover:bg-orange-100 px-2 py-0.5 rounded-lg border border-orange-200 transition shadow-2xs">
+                            <i data-lucide="clock" class="w-3 h-3"></i> Đặt giờ hiện tại
+                        </button>
+                    </div>
+                    <input type="datetime-local" id="inputStartTime" class="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition shadow-2xs cursor-pointer">
+                </div>
+
+                <!-- Lộ trình mẫu nhanh -->
+                <div class="mt-3 pt-3 border-t border-slate-100">
+                    <span class="text-xs text-slate-500 font-medium block mb-2">📍 Chọn nhanh lộ trình mẫu:</span>
+                    <div class="flex overflow-x-auto pb-1 gap-1.5 no-scrollbar sm:grid sm:grid-cols-3 md:grid-cols-5">
+                        <button type="button" onclick="loadPreset('myha')" class="shrink-0 sm:shrink px-2 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-bold transition text-center border border-orange-200 shadow-2xs whitespace-nowrap sm:whitespace-normal sm:truncate">
+                            🌾 Mỹ Hà (7.1k)
+                        </button>
+                        <button type="button" onclick="loadPreset('tanyen')" class="shrink-0 sm:shrink px-2 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition text-center border border-slate-200/60 whitespace-nowrap sm:whitespace-normal sm:truncate">
+                            🏃 Tân Yên (3.9k)
+                        </button>
+                        <button type="button" onclick="loadPreset('hoangkiem')" class="shrink-0 sm:shrink px-2 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition text-center border border-slate-200/60 whitespace-nowrap sm:whitespace-normal sm:truncate">
+                            Hồ Gươm (1.7k)
+                        </button>
+                        <button type="button" onclick="loadPreset('thongnhat')" class="shrink-0 sm:shrink px-2 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition text-center border border-slate-200/60 whitespace-nowrap sm:whitespace-normal sm:truncate">
+                            CV Thống Nhất (2.3k)
+                        </button>
+                        <button type="button" onclick="loadPreset('tayho')" class="shrink-0 sm:shrink px-2 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition text-center border border-slate-200/60 whitespace-nowrap sm:whitespace-normal sm:truncate">
+                            Hồ Tây (5.2k)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: Pace & Km Splits -->
+            <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col gap-3.5">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xs font-bold text-slate-600 tracking-wider uppercase flex items-center gap-1.5">
+                        <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i>
+                        Tốc Độ Pace & Phân Bổ Từng Km
+                    </h2>
+                    <span class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full" id="splitCountBadge">0 Km</span>
+                </div>
+
+                <!-- Pace Slider chính -->
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/70">
+                    <div class="flex items-center justify-between text-xs font-medium text-slate-700 mb-1.5">
+                        <span class="flex items-center gap-1.5"><i data-lucide="zap" class="w-3.5 h-3.5 text-orange-500"></i> Pace trung bình mong muốn:</span>
+                        <span class="text-sm font-bold text-orange-600 font-mono" id="paceDisplay">5:30 min/km</span>
+                    </div>
+                    <input type="range" id="inputPaceSlider" min="240" max="660" step="5" value="330" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-500">
+                    <div class="flex justify-between text-[11px] text-slate-400 mt-1">
+                        <span>4:00 (Nhanh)</span>
+                        <span>7:00 (Vừa)</span>
+                        <span>11:00 (Chậm nhất)</span>
+                    </div>
+                </div>
+
+                <!-- SPM Cadence Slider chính -->
+                <div class="bg-cyan-50/50 p-3 rounded-xl border border-cyan-200/70">
+                    <div class="flex items-center justify-between text-xs font-medium text-slate-700 mb-1.5">
+                        <span class="flex items-center gap-1.5 font-bold text-slate-800">
+                            <i data-lucide="footprints" class="w-3.5 h-3.5 text-cyan-600"></i> Guồng chân trung bình (Cadence):
+                        </span>
+                        <span class="text-sm font-bold text-cyan-700 font-mono" id="mainCadenceDisplay">172 SPM</span>
+                    </div>
+                    <input type="range" id="inputCadenceBase" min="100" max="210" step="1" value="172" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-cyan-600">
+                    <div class="flex justify-between text-[11px] text-slate-400 mt-1">
+                        <span>100 (Đi bộ dưỡng sinh)</span>
+                        <span>160-175 (Chạy vừa)</span>
+                        <span>210 (Nước rút/Elite)</span>
+                    </div>
+
+                    <!-- Lựa chọn định dạng xuất file TCX cho vRace / Strava -->
+                    <div class="mt-2.5 pt-2 border-t border-cyan-200/60 flex flex-wrap items-center justify-between gap-1 text-[11px]">
+                        <span class="text-slate-600 font-medium">Chuẩn xuất TCX:</span>
+                        <div class="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-cyan-200">
+                            <label class="cursor-pointer px-2 py-0.5 rounded font-medium transition text-xs bg-cyan-600 text-white shadow-2xs" id="lblCadenceModeAuto">
+                                <input type="radio" name="cadenceExportMode" value="auto" checked class="hidden" onchange="onCadenceModeChange()">
+                                Chuẩn Strava/vRace (Khuyên dùng)
+                            </label>
+                            <label class="cursor-pointer px-2 py-0.5 rounded font-medium transition text-xs text-slate-600 hover:text-slate-900" id="lblCadenceModeRaw">
+                                <input type="radio" name="cadenceExportMode" value="raw" class="hidden" onchange="onCadenceModeChange()">
+                                Giữ nguyên SPM
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chiến thuật Pace từng Km -->
+                <div>
+                    <span class="text-xs text-slate-600 font-medium block mb-1.5">Chiến thuật biến thiên giữa các Km:</span>
+                    <div class="grid grid-cols-3 gap-1.5 text-xs">
+                        <button type="button" onclick="setSplitStrategy('random')" id="btnStratRandom" class="strat-btn py-1.5 px-2 rounded-xl bg-orange-50 border border-orange-300 text-orange-700 font-semibold text-center transition truncate hover:bg-orange-100">
+                            🎲 Ngẫu nhiên
+                        </button>
+                        <button type="button" onclick="setSplitStrategy('fartlek')" id="btnStratFartlek" class="strat-btn py-1.5 px-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-medium text-center transition truncate hover:bg-slate-200">
+                            ⚡ Biến tốc
+                        </button>
+                        <button type="button" onclick="setSplitStrategy('fatigue')" id="btnStratFatigue" class="strat-btn py-1.5 px-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-medium text-center transition truncate hover:bg-slate-200">
+                            📉 Đuối dần
+                        </button>
+                        <button type="button" onclick="setSplitStrategy('progressive')" id="btnStratProgressive" class="strat-btn py-1.5 px-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-medium text-center transition truncate hover:bg-slate-200">
+                            📈 Tăng tốc
+                        </button>
+                        <button type="button" onclick="setSplitStrategy('even')" id="btnStratEven" class="strat-btn py-1.5 px-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-medium text-center transition truncate hover:bg-slate-200">
+                            ⚖️ Đều đặn
+                        </button>
+                        <button type="button" onclick="setSplitStrategy('custom')" id="btnStratCustom" class="strat-btn py-1.5 px-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-medium text-center transition truncate hover:bg-slate-200">
+                            ✏️ Tự chỉnh tay
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Thanh trượt độ chênh lệch giữa các Km -->
+                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200/70">
+                    <div class="flex items-center justify-between text-xs text-slate-600 mb-1">
+                        <span>Độ chênh lệch giữa các Km:</span>
+                        <span class="text-xs font-bold text-orange-600" id="kmVarianceDisplay">± 75s (~1p15s /km)</span>
+                    </div>
+                    <input type="range" id="inputKmVariance" min="15" max="150" step="5" value="75" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-500">
+                    <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                        <span>±15s (Nhẹ)</span>
+                        <span>±75s (5:00 ↔ 6:30)</span>
+                        <span>±150s (5:00 ↔ 7:30)</span>
+                    </div>
+                    <div class="mt-2 pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                        <span class="text-[11px] text-slate-500">Km này chạy nhanh, km khác mệt chạy chậm</span>
+                        <button type="button" onclick="randomizeSplits()" class="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg flex items-center gap-1 shadow-2xs transition">
+                            <i data-lucide="shuffle" class="w-3 h-3 text-orange-500"></i> Đổi ngẫu nhiên
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Danh sách Km trực quan -->
+                <div>
+                    <div class="flex items-center justify-between text-xs text-slate-500 font-medium mb-1.5">
+                        <span>Chi tiết Pace từng Km:</span>
+                        <span class="text-[11px] text-slate-400">Kéo thanh gạt để đổi tốc độ</span>
+                    </div>
+                    <div id="kmSplitsContainer" class="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+                        <!-- Dynamic items rendered here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2.5: Advanced Options -->
+            <details class="group bg-white border border-slate-200/80 rounded-2xl shadow-sm p-3.5 transition">
+                <summary class="flex items-center justify-between cursor-pointer text-xs font-bold text-slate-700 select-none">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="sliders" class="w-4 h-4 text-slate-500"></i>
+                        <span>Cài Đặt Nâng Cao (Nhịp Tim, Guồng Chân, Rung GPS)</span>
+                    </div>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180"></i>
+                </summary>
+
+                <div class="mt-3.5 pt-3 border-t border-slate-100 flex flex-col gap-3.5">
+                    <!-- Cadence Noise / Fluctuation -->
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/70">
+                        <div class="flex items-center justify-between text-xs font-medium text-slate-700 mb-1.5">
+                            <span class="flex items-center gap-1.5"><i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-600"></i> Độ biến động guồng chân (Noise SPM):</span>
+                            <span class="font-bold text-cyan-700 font-mono" id="cadenceDisplay">± 3 SPM</span>
+                        </div>
+                        <input type="range" id="inputCadenceNoise" min="1" max="8" step="1" value="3" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-cyan-600">
+                        <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                            <span>± 1 SPM (Đều)</span>
+                            <span>± 3 SPM (Tự nhiên)</span>
+                            <span>± 8 SPM (Dao động mạnh)</span>
+                        </div>
+                    </div>
+
+                    <!-- Heart rate -->
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/70">
+                        <div class="flex items-center justify-between text-xs font-medium text-slate-700 mb-1.5">
+                            <span class="flex items-center gap-1.5"><i data-lucide="heart" class="w-3.5 h-3.5 text-rose-500"></i> Nhịp tim (Heart Rate):</span>
+                            <span class="font-bold text-rose-600 font-mono" id="hrDisplay">135 ➔ 162 BPM</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-[11px]">
+                            <div>
+                                <span class="text-slate-500 block mb-1">Khởi điểm (Warm-up):</span>
+                                <input type="number" id="inputHrStart" min="90" max="150" value="135" class="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800">
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block mb-1">Mức duy trì:</span>
+                                <input type="number" id="inputHrTarget" min="95" max="195" value="162" class="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Behavioral Checkboxes -->
+                    <div class="grid grid-cols-1 gap-1.5 text-xs text-slate-600 pt-1">
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="chkHumanCurve" checked class="rounded border-slate-300 text-orange-500 focus:ring-0">
+                            <span class="font-medium text-slate-700">🌱 Uốn lượn tự nhiên mềm mại (Đường đi hơi cong cong, không thẳng đơ)</span>
+                        </label>
+                        <!-- Thanh trượt kiểm soát biên độ cong bám sát mặt đường -->
+                        <div class="ml-6 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/70 space-y-1">
+                            <div class="flex items-center justify-between text-[11px] text-slate-600">
+                                <span class="font-medium text-slate-700 flex items-center gap-1">
+                                    <i data-lucide="git-commit" class="w-3 h-3 text-orange-500"></i> Độ cong / dạt lề bám đường:
+                                </span>
+                                <span class="text-xs font-bold text-orange-600 font-mono" id="curveAmpDisplay">6.2m (Chuẩn người thật)</span>
+                            </div>
+                            <input type="range" id="inputCurveAmp" min="1.0" max="10.0" step="0.5" value="6.2" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-500">
+                            <div class="flex justify-between text-[10px] text-slate-400">
+                                <span>1.0m (Cong nhẹ)</span>
+                                <span class="text-emerald-600 font-bold">6.2m (Chuẩn người thật)</span>
+                                <span>10.0m (Lượn rộng)</span>
+                            </div>
+                        </div>
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="chkCornerSlowdown" checked class="rounded border-slate-300 text-orange-500 focus:ring-0">
+                            <span>🔄 Giảm tốc khi vào khúc cua / ngã rẽ (~15-25%)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="chkSprintFinish" checked class="rounded border-slate-300 text-orange-500 focus:ring-0">
+                            <span>🏁 Nước rút về đích (Sprint 120m cuối)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="chkGpsJitter" checked class="rounded border-slate-300 text-orange-500 focus:ring-0">
+                            <span>📡 Rung nhiễu GPS vi mô (±0.8m chuẩn đồng hồ Garmin)</span>
+                        </label>
+                        <input type="hidden" id="inputPaceVariance" value="8">
+                    </div>
+                </div>
+            </details>
+
+            <!-- Card: Thiết Bị Ghi Nhận (Creator Device) -->
+            <div class="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-xs">
+                <div class="flex items-center justify-between text-xs font-medium text-slate-700 mb-1.5">
+                    <span class="flex items-center gap-1.5 font-bold text-slate-800">
+                        <i data-lucide="watch" class="w-3.5 h-3.5 text-indigo-600"></i> Thiết Bị Đồng Hồ (Hỗ Trợ Strava):
+                    </span>
+                    <span class="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">✓ Chuẩn Strava/vRace</span>
+                </div>
+                <div class="space-y-1.5">
+                    <select id="inputDeviceName" class="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition cursor-pointer">
+                        <optgroup label="🏃 Garmin Chạy Bộ (Hiển Thị Huy Hiệu Strava 100%)">
+                            <option value="Garmin Forerunner 965" selected>Garmin Forerunner 965 (Flagship AMOLED)</option>
+                            <option value="Garmin Forerunner 265">Garmin Forerunner 265 (Phổ biến nhất)</option>
+                            <option value="Garmin Forerunner 955">Garmin Forerunner 955 (Màn hình MIP)</option>
+                            <option value="Garmin Forerunner 255">Garmin Forerunner 255 (Tầm trung)</option>
+                            <option value="Garmin Forerunner 745">Garmin Forerunner 745 (Triathlon)</option>
+                            <option value="Garmin Forerunner 245">Garmin Forerunner 245 (Quốc dân)</option>
+                        </optgroup>
+                        <optgroup label="⛰️ Garmin Outdoor / Multisport">
+                            <option value="Garmin Fenix 7 Pro">Garmin Fenix 7 Pro (Cao cấp)</option>
+                            <option value="Garmin Fenix 7">Garmin Fenix 7 (Bền bỉ)</option>
+                        </optgroup>
+                        <optgroup label="📱 Thiết Bị Di Động / Ẩn Đồng Hồ">
+                            <option value="none">📱 Không dùng đồng hồ (Ghi bằng điện thoại / Ẩn thiết bị trên Strava)</option>
+                        </optgroup>
+                    </select>
+                    <div class="flex flex-wrap gap-1 items-center">
+                        <span class="text-[10px] text-slate-400 mr-0.5">Chọn nhanh:</span>
+                        <button type="button" class="btn-device-tag px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-bold transition" data-name="Garmin Forerunner 965">FR 965</button>
+                        <button type="button" class="btn-device-tag px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg text-[10px] font-medium transition" data-name="Garmin Forerunner 265">FR 265</button>
+                        <button type="button" class="btn-device-tag px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg text-[10px] font-medium transition" data-name="Garmin Fenix 7 Pro">Fenix 7 Pro</button>
+                        <button type="button" class="btn-device-tag px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg text-[10px] font-medium transition" data-name="Garmin Forerunner 955">FR 955</button>
+                        <button type="button" class="btn-device-tag px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg text-[10px] font-medium transition" data-name="Garmin Forerunner 255">FR 255</button>
+                        <button type="button" class="btn-device-tag px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg text-[10px] font-medium transition" data-name="none">📱 Không đồng hồ</button>
+                    </div>
+                    <p class="text-[10px] text-slate-400 italic">💡 File .TCX là chuẩn của Garmin nên Strava chỉ hiển thị tên thiết bị cho các dòng Garmin có mã SDK ở trên.</p>
+                </div>
+            </div>
+
+            <!-- Card 3: Action Buttons -->
+            <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col gap-2.5">
+                <!-- Nút Xuất TCX Lớn Nổi Bật -->
+                <button type="button" id="btnExport" class="w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-sm shadow-md shadow-orange-500/25 transition transform active:scale-[0.99]">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    Xuất File .TCX Chuẩn Garmin / Strava
+                </button>
+
+                <!-- Nút Tạo File Hàng Loạt Mới -->
+                <button type="button" id="btnOpenBatchModal" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200/80 transition">
+                    <i data-lucide="layers" class="w-4 h-4 text-indigo-600"></i>
+                    📦 Tạo File Hàng Loạt Trong Vùng Chọn (Pace > 7p/km)
+                </button>
+
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" id="btnPreview" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200/60 transition">
+                        <i data-lucide="line-chart" class="w-3.5 h-3.5 text-blue-600"></i>
+                        Xem trước
+                    </button>
+                    <button type="button" id="btnUndo" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200/60 transition">
+                        <i data-lucide="undo" class="w-3.5 h-3.5 text-slate-500"></i>
+                        Hoàn tác
+                    </button>
+                    <button type="button" id="btnClear" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold border border-rose-200/60 transition">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-500"></i>
+                        Xóa lộ trình
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: Interactive Map & Telemetry (7 Cols on LG) -->
+        <div class="lg:col-span-7 flex flex-col gap-5">
+            
+            <!-- Map Card: Wrapped in mobilePanelMap -->
+            <div id="mobilePanelMap" class="flex flex-col gap-3">
+                <div id="mapCard" class="bg-white border border-slate-200/80 rounded-2xl p-3 sm:p-3.5 shadow-sm flex flex-col transition-all">
+                    <!-- Map Toolbar -->
+                    <div class="flex flex-col gap-2 mb-2 px-1">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                                <span class="text-xs font-bold text-slate-800">Bản Đồ Lộ Trình</span>
+                                <span class="text-[11px] text-slate-400 hidden sm:inline">(Nhấp trên bản đồ để nối điểm)</span>
+                            </div>
+                            
+                            <div class="flex items-center gap-1.5">
+                                <!-- Nút GPS định vị -->
+                                <button type="button" onclick="locateUserLocation()" title="Định vị GPS vị trí của bạn" class="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-xl border border-emerald-200 active:scale-95 transition shadow-2xs">
+                                    <i data-lucide="crosshair" class="w-3.5 h-3.5 text-emerald-600"></i>
+                                    <span class="hidden sm:inline">Vị trí của tôi</span>
+                                </button>
+                                <!-- Nút Phóng to bản đồ -->
+                                <button type="button" onclick="toggleMapFullscreen()" id="btnMapFullscreenDesk" title="Phóng to bản đồ" class="flex items-center justify-center p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition">
+                                    <i data-lucide="maximize" class="w-3.5 h-3.5 text-slate-600"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <!-- Toggle Snap to Road -->
+                            <label class="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200 cursor-pointer select-none hover:bg-emerald-100/70 transition">
+                                <input type="checkbox" id="chkSnapToRoad" checked class="rounded border-emerald-400 bg-white text-emerald-600 focus:ring-0 w-3.5 h-3.5">
+                                <span class="flex items-center gap-1"><i data-lucide="footprints" class="w-3.5 h-3.5 text-emerald-600"></i> Bám đường (Foot Routing)</span>
+                            </label>
+
+                            <!-- Chọn vùng giới hạn trên bản đồ -->
+                            <button type="button" id="btnToggleZoneSelect" class="flex items-center gap-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2.5 py-1.5 rounded-xl border border-purple-200 transition">
+                                <i data-lucide="scan" class="w-3.5 h-3.5 text-purple-600"></i>
+                                <span id="btnToggleZoneText">Khoanh vùng tạo hàng loạt</span>
+                            </button>
+
+                            <!-- Spinner -->
+                            <div id="routingSpinner" class="hidden items-center gap-1.5 text-xs text-amber-600 font-medium">
+                                <svg class="animate-spin h-3.5 w-3.5 text-amber-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                </svg>
+                                <span>Đang dò đường...</span>
+                            </div>
+
+                            <!-- Search Place -->
+                            <div class="flex-1 flex gap-1 min-w-[180px]">
+                                <div class="relative flex-1">
+                                    <input type="text" id="inputSearchPlace" placeholder="Tìm kiếm địa điểm..." class="w-full bg-slate-50 border border-slate-200 text-xs rounded-xl pl-7 pr-2 py-1.5 text-slate-800 focus:outline-none focus:border-orange-500">
+                                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+                                </div>
+                                <button type="button" id="btnSearchPlace" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-xl text-xs font-medium">
+                                    Tìm
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Presets Carousel on Map -->
+                    <div class="flex items-center gap-1.5 mb-2 overflow-x-auto no-scrollbar scroll-smooth pb-0.5">
+                        <span class="text-[10px] text-slate-400 font-bold shrink-0">📍 Mẫu nhanh:</span>
+                        <button type="button" onclick="loadPreset('myha')" class="shrink-0 px-2 py-1 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 text-[11px] font-bold border border-orange-200 shadow-2xs">🌾 Mỹ Hà (7.1k)</button>
+                        <button type="button" onclick="loadPreset('tanyen')" class="shrink-0 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium border border-slate-200">🏃 Tân Yên (3.9k)</button>
+                        <button type="button" onclick="loadPreset('hoangkiem')" class="shrink-0 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium border border-slate-200">Hồ Gươm (1.7k)</button>
+                        <button type="button" onclick="loadPreset('thongnhat')" class="shrink-0 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium border border-slate-200">CV Thống Nhất (2.3k)</button>
+                        <button type="button" onclick="loadPreset('tayho')" class="shrink-0 px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium border border-slate-200">Hồ Tây (5.2k)</button>
+                    </div>
+
+                    <!-- Leaflet Map Element with Relative Wrapper for Floating HUD -->
+                    <div class="relative w-full rounded-xl overflow-hidden border border-slate-200">
+                        <!-- Floating HUD Quick Stats on Map -->
+                        <div class="absolute top-2.5 left-2.5 right-2.5 z-[400] pointer-events-none flex justify-center">
+                            <div class="pointer-events-auto bg-white/90 backdrop-blur-md border border-slate-200/90 shadow-sm rounded-xl px-3 py-1.5 flex items-center justify-around gap-3 text-center text-xs">
+                                <div>
+                                    <span class="text-[9px] text-slate-400 font-medium block">Cự ly</span>
+                                    <span id="mobStatDistance" class="font-extrabold text-slate-900 text-xs sm:text-sm">0.00 km</span>
+                                </div>
+                                <div class="h-5 w-px bg-slate-200"></div>
+                                <div>
+                                    <span class="text-[9px] text-slate-400 font-medium block">Thời gian</span>
+                                    <span id="mobStatDuration" class="font-bold text-emerald-600 font-mono text-xs sm:text-sm">00:00:00</span>
+                                </div>
+                                <div class="h-5 w-px bg-slate-200"></div>
+                                <div>
+                                    <span class="text-[9px] text-slate-400 font-medium block">Pace TB</span>
+                                    <span id="mobStatPace" class="font-bold text-orange-600 font-mono text-xs sm:text-sm">5:30 /km</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="map" class="w-full h-[400px] sm:h-[440px] md:h-[480px] z-10"></div>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 mt-2 px-1">
+                        <div class="flex items-center gap-2.5 text-[11px]">
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> (A) Xuất phát</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> (B) Đích</span>
+                            <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-orange-500 inline-block"></span> Tuyến đường</span>
+                        </div>
+                        <span class="text-slate-400 italic text-[11px] hidden sm:inline">Kéo chấm tròn để nắn đường</span>
+                    </div>
+
+                    <!-- Mobile Quick Action Bar (Chỉ hiển thị trên mobile) -->
+                    <div class="grid grid-cols-5 gap-1.5 mt-2.5 p-1.5 bg-slate-50 border border-slate-200/90 rounded-xl lg:hidden">
+                        <button type="button" onclick="locateUserLocation()" class="flex flex-col items-center justify-center py-2 px-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[10px] font-bold active:scale-95 transition shadow-2xs">
+                            <i data-lucide="crosshair" class="w-4 h-4 text-emerald-600 mb-0.5"></i>
+                            <span>Vị trí</span>
+                        </button>
+                        <button type="button" onclick="undoLastPoint()" class="flex flex-col items-center justify-center py-2 px-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[10px] font-bold active:scale-95 transition shadow-2xs">
+                            <i data-lucide="undo" class="w-4 h-4 text-slate-500 mb-0.5"></i>
+                            <span>Hoàn tác</span>
+                        </button>
+                        <button type="button" onclick="clearRoute()" class="flex flex-col items-center justify-center py-2 px-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 text-[10px] font-bold active:scale-95 transition shadow-2xs">
+                            <i data-lucide="trash-2" class="w-4 h-4 text-rose-500 mb-0.5"></i>
+                            <span>Xóa</span>
+                        </button>
+                        <button type="button" onclick="toggleMapFullscreen()" id="btnMapFullscreen" class="flex flex-col items-center justify-center py-2 px-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[10px] font-bold active:scale-95 transition shadow-2xs">
+                            <i data-lucide="maximize" class="w-4 h-4 text-indigo-600 mb-0.5"></i>
+                            <span>Phóng to</span>
+                        </button>
+                        <button type="button" onclick="document.getElementById('btnExport').click()" class="flex flex-col items-center justify-center py-2 px-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[10px] font-extrabold active:scale-95 transition shadow-xs">
+                            <i data-lucide="download" class="w-4 h-4 mb-0.5"></i>
+                            <span>Xuất TCX</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Section (Telemetry Preview Chart & Splits Table) -->
+            <div id="mobilePanelAnalysis" class="hidden lg:flex flex-col gap-5">
+                
+                <!-- Telemetry Preview Chart -->
+                <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="trending-up" class="w-4 h-4 text-blue-600"></i>
+                            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                Biểu Đồ Telemetry Từng Giây (Pace, Nhịp Tim & Guồng Chân)
+                            </h3>
+                        </div>
+                        <span class="text-xs text-slate-400 font-mono" id="chartStatusText">Chưa nạp dữ liệu</span>
+                    </div>
+
+                    <div class="w-full h-56 relative">
+                        <canvas id="telemetryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Splits Table (Bảng Thống Kê Splits Từng Kilomet) -->
+                <div class="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="layers" class="w-4 h-4 text-emerald-600"></i>
+                            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                Bảng Phân Tích Chặng Từng Kilomet (Garmin / Strava Laps)
+                            </h3>
+                        </div>
+                        <span class="text-xs text-slate-400 font-medium">Chuẩn 1000m / Lap</span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50">
+                                    <th class="py-2.5 px-3 rounded-l-lg">Chặng</th>
+                                    <th class="py-2.5 px-3">Cự ly</th>
+                                    <th class="py-2.5 px-3">Tốc độ Pace</th>
+                                    <th class="py-2.5 px-3">Thời gian</th>
+                                    <th class="py-2.5 px-3">Nhịp tim (BPM)</th>
+                                    <th class="py-2.5 px-3 rounded-r-lg">Cadence (SPM)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="splitsTableBody">
+                                <tr><td colspan="6" class="text-center py-3 text-xs text-slate-400 italic">Vẽ lộ trình trên bản đồ để xem bảng Splits</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Modal Tạo File Hàng Loạt Chuẩn Pace > 7p/km Trong Vùng Giới Hạn (Mobile Scrollable) -->
+    <div id="batchModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 transform transition-all overflow-hidden">
+            <!-- Modal Header (Fixed) -->
+            <div class="flex items-center justify-between p-3.5 sm:p-4 border-b border-slate-100 shrink-0">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shrink-0">
+                        <i data-lucide="layers" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800">Tạo File TCX Hàng Loạt Ngẫu Nhiên</h3>
+                        <p class="text-[11px] text-slate-500">Giới hạn trong vùng bản đồ đã khoanh & Pace > 7:00 /km</p>
+                    </div>
+                </div>
+                <button type="button" id="btnCloseBatchModal" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content (Scrollable with smooth touch) -->
+            <div class="p-3.5 sm:p-4 overflow-y-auto space-y-3.5 text-xs text-slate-700 flex-1">
+                <!-- Vùng chọn hiện tại -->
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-semibold text-slate-800 flex items-center gap-1.5">
+                            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-purple-600"></i> Vùng giới hạn trên bản đồ:
+                        </span>
+                        <span id="batchZoneStatus" class="font-mono text-xs font-bold text-purple-700">Tân Yên (Mặc định)</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500">
+                        Tất cả các file sinh ra sẽ tạo lộ trình ngẫu nhiên khép kín nằm hoàn toàn bên trong khung viền chữ nhật này.
+                    </p>
+                    <div class="mt-2 flex gap-2">
+                        <button type="button" id="btnSetZoneCurrentView" class="px-2.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-[11px] font-medium text-slate-700 transition">
+                            🎯 Lấy khung nhìn hiện tại của bản đồ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cấu hình số lượng file & Quãng đường -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                        <label class="block font-semibold text-slate-800 mb-1">Số lượng file (.tcx):</label>
+                        <input type="number" id="inputBatchCount" min="1" max="50" value="5" class="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800">
+                        <span class="text-[10px] text-slate-400 mt-1 block">Tối đa 50 file nén .ZIP</span>
+                    </div>
+                    <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                        <label class="block font-semibold text-slate-800 mb-1">Cự ly mỗi bài (km):</label>
+                        <div class="flex items-center gap-1">
+                            <input type="number" id="inputBatchDistMin" min="1" max="30" step="0.5" value="3.0" class="w-1/2 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium text-slate-800 text-center">
+                            <span class="text-slate-400">➔</span>
+                            <input type="number" id="inputBatchDistMax" min="1" max="42" step="0.5" value="5.5" class="w-1/2 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-medium text-slate-800 text-center">
+                        </div>
+                        <span class="text-[10px] text-slate-400 mt-1 block">Khoảng cách ngẫu nhiên</span>
+                    </div>
+                </div>
+
+                <!-- Cấu hình Pace (Bắt buộc > 7 phút / km) -->
+                <div class="bg-amber-50/60 p-3 rounded-xl border border-amber-200">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="font-bold text-amber-900 flex items-center gap-1.5">
+                            <i data-lucide="gauge" class="w-3.5 h-3.5 text-amber-600"></i> Tốc độ Pace (> 7:00 /km):
+                        </span>
+                        <span id="batchPaceDisplay" class="font-mono text-xs font-bold text-amber-800">7:15 ➔ 11:00 /km</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[11px]">
+                        <div>
+                            <span class="text-slate-600 block mb-0.5">Pace nhanh nhất (Tối thiểu 7:00):</span>
+                            <input type="text" id="inputBatchPaceMin" value="7:15" placeholder="7:15" class="w-full bg-white border border-amber-300 rounded-lg px-2.5 py-1 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-amber-500">
+                        </div>
+                        <div>
+                            <span class="text-slate-600 block mb-0.5">Pace chậm nhất (Lên đến 11:00):</span>
+                            <input type="text" id="inputBatchPaceMax" value="11:00" placeholder="11:00" class="w-full bg-white border border-amber-300 rounded-lg px-2.5 py-1 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-amber-500">
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-amber-700 mt-1.5 italic">
+                        ⚡ Đã hỗ trợ Pace chậm nhất lên đến 11:00 /km (hỗ trợ nhập 11,0 hoặc 11:00) cho đi bộ hoặc chạy chậm vRace.
+                    </p>
+                </div>
+
+                <!-- Thiết bị thể thao sử dụng trong gói batch -->
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="font-semibold text-slate-800 flex items-center gap-1.5">
+                            <i data-lucide="watch" class="w-3.5 h-3.5 text-indigo-600"></i> Thiết Bị Thể Thao (Hỗ Trợ Strava):
+                        </span>
+                        <span class="text-[10px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">✓ Chuẩn Strava/vRace</span>
+                    </div>
+                    <div class="space-y-1.5">
+                        <select id="inputBatchDeviceName" class="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 cursor-pointer">
+                            <optgroup label="🏃 Garmin Chạy Bộ (Hiển Thị Huy Hiệu Strava 100%)">
+                                <option value="Garmin Forerunner 965" selected>Garmin Forerunner 965 (Flagship AMOLED)</option>
+                                <option value="Garmin Forerunner 265">Garmin Forerunner 265 (Phổ biến nhất)</option>
+                                <option value="Garmin Forerunner 955">Garmin Forerunner 955 (Màn hình MIP)</option>
+                                <option value="Garmin Forerunner 255">Garmin Forerunner 255 (Tầm trung)</option>
+                                <option value="Garmin Forerunner 745">Garmin Forerunner 745 (Triathlon)</option>
+                                <option value="Garmin Forerunner 245">Garmin Forerunner 245 (Quốc dân)</option>
+                            </optgroup>
+                            <optgroup label="⛰️ Garmin Outdoor / Multisport">
+                                <option value="Garmin Fenix 7 Pro">Garmin Fenix 7 Pro (Cao cấp)</option>
+                                <option value="Garmin Fenix 7">Garmin Fenix 7 (Bền bỉ)</option>
+                            </optgroup>
+                            <optgroup label="📱 Thiết Bị Di Động / Ẩn Đồng Hồ">
+                                <option value="none">📱 Không dùng đồng hồ (Ghi bằng điện thoại / Ẩn thiết bị trên Strava)</option>
+                            </optgroup>
+                        </select>
+                        <div class="flex flex-wrap gap-1 items-center">
+                            <span class="text-[10px] text-slate-400 mr-0.5">Chọn nhanh:</span>
+                            <button type="button" class="btn-batch-device-tag px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-[10px] font-bold transition" data-name="Garmin Forerunner 965">FR 965</button>
+                            <button type="button" class="btn-batch-device-tag px-2 py-0.5 bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg text-[10px] font-medium transition" data-name="Garmin Forerunner 265">FR 265</button>
+                            <button type="button" class="btn-batch-device-tag px-2 py-0.5 bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg text-[10px] font-medium transition" data-name="Garmin Fenix 7 Pro">Fenix 7 Pro</button>
+                            <button type="button" class="btn-batch-device-tag px-2 py-0.5 bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg text-[10px] font-medium transition" data-name="Garmin Forerunner 955">FR 955</button>
+                            <button type="button" class="btn-batch-device-tag px-2 py-0.5 bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg text-[10px] font-medium transition" data-name="Garmin Forerunner 255">FR 255</button>
+                            <button type="button" class="btn-batch-device-tag px-2 py-0.5 bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg text-[10px] font-medium transition" data-name="none">📱 Không đồng hồ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thời gian xuất phát & Khoảng cách 10 phút giữa các file -->
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2.5 text-xs">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="font-semibold text-slate-800 block">Thời gian bắt đầu bài 1:</span>
+                            <span class="text-[11px] text-slate-500">Giờ xuất phát bài chạy đầu tiên</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <input type="datetime-local" id="inputBatchStartDateTime" class="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-mono font-medium text-slate-800">
+                            <button type="button" id="btnSetBatchNow" class="text-[11px] text-orange-600 font-semibold hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2 py-1 rounded-lg border border-orange-200 transition">
+                                Giờ này
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                        <div>
+                            <span class="font-semibold text-slate-800 block">Khoảng cách giữa các file:</span>
+                            <span id="batchGapDescription" class="text-[11px] text-indigo-600 font-medium">Mỗi file cách nhau 10 phút (sau khi bài trước kết thúc)</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <input type="number" id="inputBatchGapMinutes" min="0" max="720" value="10" class="w-14 bg-white border border-indigo-300 rounded-lg px-2 py-1 text-xs font-mono font-bold text-indigo-700 text-center focus:outline-none focus:border-indigo-500">
+                            <span class="text-xs text-slate-600 font-medium">phút</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-1 flex items-center justify-between text-[11px]">
+                        <span class="text-slate-500">Cách tính dãn cách:</span>
+                        <select id="selectBatchGapMode" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] text-slate-700 font-medium focus:outline-none">
+                            <option value="after_finish" selected>Nghỉ 10 phút sau bài trước (Khuyên dùng - Không đè giờ)</option>
+                            <option value="fixed_start">Cố định cách nhau 10 phút từ lúc xuất phát</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div id="batchProgressContainer" class="hidden space-y-1.5 pt-1">
+                    <div class="flex items-center justify-between text-[11px]">
+                        <span id="batchProgressText" class="font-medium text-indigo-700">Đang khởi tạo...</span>
+                        <span id="batchProgressPercent" class="font-mono font-bold text-slate-600">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                        <div id="batchProgressBar" class="bg-indigo-600 h-2 rounded-full transition-all duration-200" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer (Fixed) -->
+            <div class="p-3 sm:p-4 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0 bg-slate-50/50">
+                <button type="button" id="btnCancelBatch" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-semibold text-xs transition">
+                    Đóng
+                </button>
+                <button type="button" id="btnStartBatchGenerate" class="px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition flex items-center gap-1.5">
+                    <i data-lucide="file-archive" class="w-4 h-4"></i>
+                    Bắt đầu tạo & Tải file .ZIP
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Element (Responsive Position for Mobile & Desktop) -->
+    <div id="toast" class="fixed bottom-20 lg:bottom-5 right-4 left-4 sm:left-auto sm:right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2 px-4 py-3 rounded-xl border shadow-xl text-xs font-semibold max-w-md mx-auto sm:mx-0">
+        <span id="toastIcon"></span>
+        <span id="toastMsg">Thông báo</span>
+    </div>
+
+    <!-- Modular Application Scripts (v3.7) -->
+    <script src="js/config.js?v=3.7"></script>
+    <script src="js/telemetry.js?v=3.7"></script>
+    <script src="js/tcx.js?v=3.7"></script>
+    <script src="js/map.js?v=3.7"></script>
+    <script src="js/app.js?v=3.7"></script>
+</body>
+</html>
